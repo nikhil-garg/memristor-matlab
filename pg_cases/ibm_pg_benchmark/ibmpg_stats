@@ -1,0 +1,8 @@
+Benchmark               #R      #C      #L      #I      #V      Matrix Size
+ibmpg1t/ibmpg1t.spice   40801   10774   277     10774   14308   54265
+ibmpg2t/ibmpg2t.spice   245163  36838   330     36838   330     164897
+ibmpg3t/ibmpg3t.spice   1602626 201054  955     201054  955     1043444
+ibmpg4t/ibmpg4t.spice   1826589 265944  962     265944  962     1214288
+ibmpg5t/ibmpg5t.spice   1550048 473200  277     473200  539087  2092148
+ibmpg6t/ibmpg6t.spice   2410486 761484  381     761484  836239  3203802
+
