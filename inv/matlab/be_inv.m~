@@ -1,0 +1,78 @@
+%simulate a simple inverter using BE method
+
+%add mex & matlab function path
+addpath([pwd, '/../../../mex']);
+addpath([pwd, '/../../../matlab_sim_func']);
+addpath([pwd, '/../../../matlab_sim_func/model_level1']);
+addpath([pwd, '/../../../matlab_sim_func/kernels']);
+addpath([pwd, '/../../../matlab_sim_func/analysis']);
+addpath([pwd, '/../../../matlab_sim_func/utils']);
+
+%create empty simulation parameter structure
+[sim_param] = CreateSimStruct;
+
+%simulation setting
+sim_param.max_iter = 100;
+sim_param.err_tol = 1e-5;
+
+
+%simulation setting
+max_iter = 100;
+err_tol = 1e-5;
+Isupply = 1; %1A
+    
+%load inverter circuit
+[Gl Cl pins nins max_node_num] = load_inv_ckt_mexp_r_load_case;
+
+%load input currents
+[B InputSrcs] = LoadInputFile('inputs.dat', max_node_num);
+
+%BSIM3 model loading and instance initialization
+[ptr_model_card] = LoadBSIM3Model('tsmc90.spice3');
+
+%show up the loaded model card name
+%ListModelName(ptr_model_card)
+[ptr_instance] = LoadBSIM3Instance( pins, nins, ptr_model_card, 'pch1', 'nch1', max_node_num, 27.00);
+
+%input setup 
+step_size = 1*10^-12; %10ps
+end_time = 1*10^-9; %1ns
+time = 0:step_size:10^-9; %0~1ns
+
+input = ComputePWLInputs(InputSrcs, 0, step_size, end_time);
+voltage = zeros(size(Gl,1), 1);
+
+x = zeros(size(voltage));
+b = zeros(size(Gl,1), 1);
+
+%call DC analysis 
+[x tot_it converged] = DC_Analysis(ptr_instance, voltage, Gl, Cl, B, input, err_tol, max_iter);
+
+result = zeros(size(Gl, 1), size(time, 2));
+
+pre_voltage = x;
+result(:,1) = x;
+first_time = 1;
+prev_time = 0;
+%transient analysis
+for i = 2:size(time, 2)
+    %prediction for the next time step initial voltage
+    voltage = pre_voltage;
+    prev_time = time(i-1);
+    if (i == 52)
+        i;
+    end
+    %read the input for next time step
+    [input max_step_size] = ComputePWLInputs(InputSrcs, prev_time, step_size, end_time);
+    
+    %perform NR iteration in backward Euler method
+    [voltage] = BE_NR_AC_Analysis(ptr_instance, voltage, pre_voltage, Gl, Cl, B, input, ...
+				  step_size, first_time, err_tol, max_iter);
+
+    %TODO:
+    %check the convergence
+
+    %update previous time step and save the result
+    pre_voltage = voltage;
+    result(:,i) = voltage;
+end

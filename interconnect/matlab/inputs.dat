@@ -1,0 +1,12 @@
+# input currents for inverter case
+# # for comments
+# first line is number of input sources
+1
+# node number for this input source
+0 1
+# (time current) pair
+0 0
+500e-12 0
+600e-12 1
+1e-9 1
+-1
