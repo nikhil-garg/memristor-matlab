@@ -1,0 +1,78 @@
+% Adaptive Rational Krylov Subspace and eA Computation (reduced version)
+% Inputs:
+%   SimParam: simulation parameter struct
+%   L: L matrix
+%   U: U matrix (note A = C^-1*G)
+%   P: P matrix 
+%   Q: Q matrix
+%   W: W matrix in One-Exp formula
+%   Ij: Ij matrix in One-Exp formula
+%   ep: ep vector in One-Exp formula
+%   h: time step size
+%   v: initial vector
+%   scale: the target scale 
+% Output:
+%   H: resulting Hessenberg matrix
+%   V: orthonormal bases
+%   beta: 2-norm of initial vector
+%   m: actually required m 
+%   expH: result of e^(1-H^-1)*e1
+%   err: estimation error 
+function [H V beta m expH err] = Adaptive_Rational_Krylov_LU( SimParam, L, U, P, Q, C, W, Ij, ep, h, v, scale)
+
+    m = SimParam.rational_max_m;
+    err_tol = SimParam.err_tol;
+
+    N = length(v);
+    V = zeros(N, m+1);
+    H = zeros(m+1,m);
+
+    beta = norm(v, 2);
+    if (beta == 0)
+        expH = zeros(m, 1);
+        err = 0;	
+        return;
+    end
+
+    V(:,1) = v / beta;
+    
+    pre_result = zeros(N,1);
+    for j = 1:m
+        %precondition 1
+        %w = (C+h*G)\((C-h*G)*V(:,j)); %solve Cx = Av
+        
+        %precondition 2
+        %w = (C/h-G)\(C/h*V(:,j)); %solve Cx = Av
+        %w = Q*(U\(L\(P*(C/h*V(:,j)))));
+        %precondition 2 reduced version
+        w2 = Ij\(V(end-1:end,j)/h);
+        w1 = Q*(U\(L\(P*(C/h*V(1:end-2,j)-W*w2))));
+        w = [w1; w2];
+        for reoth = 1:1
+            for i = 1:j 
+                ip = w'*V(:,i);
+                H(i,j) = H(i,j) + ip;
+                w = w - ip*V(:,i);
+            end
+        end
+        H(j+1, j) = norm(w, 2);       
+        V(:,j+1) = w/H(j+1,j);   
+	
+        %check the error using posterior equation
+        [expH err] = rational_EXP0(H(1:j, 1:j), eye(j, 1), scale);
+        %err = beta/scale*H(j+1,j)*abs(err);
+        
+        %check the error using sensitivity 
+        cur_result = beta*V(:, 1:j)*expH;
+        delta = norm(cur_result - pre_result, 2)/norm(cur_result, 2);
+        pre_result = cur_result;
+        err = delta/(1-delta)*norm(cur_result, 2);
+        if (err == 0 || (j >= 4 && err < err_tol))
+            m = j;
+            H = H(1:m+1, 1:m);
+            V = V(:, 1:m+1);
+            return;
+        end
+
+    end
+end
